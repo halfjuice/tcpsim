@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP Network Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        header {
+            background-color: #6200ea;
+            color: white;
+            padding: 1rem 2rem;
+            text-align: center;
+        }
+        .container {
+            padding: 2rem;
+            display: flex;
+            gap: 2rem;
+        }
+        .control-panel, .state-panel {
+            flex: 1;
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .button {
+            background-color: #6200ea;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+        }
+        .button:hover {
+            background-color: #3700b3;
+        }
+        .host-state {
+            margin-bottom: 2rem;
+        }
+        .port-state {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .history-entry {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: #fff;
+            border-left: 3px solid #6200ea;
+        }
+        .reverse-button-container {
+            display: flex;
+            justify-content: center;
+            margin: 0.5rem 0;
+        }
+        .reverse-button {
+            width: auto;
+            min-width: 120px;
+            background-color: #4caf50;
+        }
+        .reverse-button:hover {
+            background-color: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>TCP Network Simulator</h1>
+    </header>
+    <div class="container">
+        <div class="control-panel">
+            <h2>Send Packet</h2>
+            <div class="form-group">
+                <label for="src-host">Source Host:</label>
+                <select id="src-host">
+                    <option value="1.1.1.1">1.1.1.1</option>
+                    <option value="1.1.1.2">1.1.1.2</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="src-port">Source Port:</label>
+                <input type="number" id="src-port" min="1" max="65535" value="12345">
+            </div>
+            <div class="reverse-button-container">
+                <button class="button reverse-button" onclick="reverseEndpoints()">
+                    ⇅ Reverse
+                </button>
+            </div>
+            <div class="form-group">
+                <label for="dest-host">Destination Host:</label>
+                <select id="dest-host">
+                    <option value="1.1.1.2">1.1.1.2</option>
+                    <option value="1.1.1.1">1.1.1.1</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="dest-port">Destination Port:</label>
+                <input type="number" id="dest-port" min="1" max="65535" value="80">
+            </div>
+            <div class="form-group">
+                <label for="packet-type">Packet Type:</label>
+                <select id="packet-type">
+                    <option value="SYN">SYN</option>
+                    <option value="ACK">ACK</option>
+                    <option value="SYN_ACK">SYN_ACK</option>
+                    <option value="FIN">FIN</option>
+                    <option value="FIN_ACK">FIN_ACK</option>
+                    <option value="RST">RST</option>
+                </select>
+            </div>
+            <button class="button" onclick="sendPacket()">Send Packet</button>
+        </div>
+        <div class="state-panel">
+            <div class="host-state" id="host1-state">
+                <h2>Host 1.1.1.1</h2>
+                <div id="host1-ports"></div>
+            </div>
+            <div class="host-state" id="host2-state">
+                <h2>Host 1.1.1.2</h2>
+                <div id="host2-ports"></div>
+            </div>
+        </div>
+    </div>
+    <script src="tcp-state.js"></script>
+    <script>
+        function updateHostState() {
+            // Update Host 1 state
+            const host1Ports = host1.getAllPortStates();
+            const host1PortsDiv = document.getElementById('host1-ports');
+            host1PortsDiv.innerHTML = formatPortStates(host1Ports);
+
+            // Update Host 2 state
+            const host2Ports = host2.getAllPortStates();
+            const host2PortsDiv = document.getElementById('host2-ports');
+            host2PortsDiv.innerHTML = formatPortStates(host2Ports);
+        }
+
+        function formatPortStates(portStates) {
+            let html = '';
+            for (const [port, state] of Object.entries(portStates)) {
+                html += `
+                    <div class="port-state">
+                        <h3>Port ${port}</h3>
+                        <p>State: ${state.state}</p>
+                        <p>Remote Endpoint: ${state.remoteEndpoint || 'None'}</p>
+                        <h4>History:</h4>
+                        ${state.history.map(entry => `
+                            <div class="history-entry">
+                                <strong>${entry.timestamp}</strong><br>
+                                ${entry.event}<br>
+                                State: ${entry.state}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            return html || '<p>No active ports</p>';
+        }
+
+        function reverseEndpoints() {
+            // Get all elements
+            const srcHost = document.getElementById('src-host');
+            const srcPort = document.getElementById('src-port');
+            const destHost = document.getElementById('dest-host');
+            const destPort = document.getElementById('dest-port');
+
+            // Store current values
+            const tempHost = srcHost.value;
+            const tempPort = srcPort.value;
+
+            // Swap values
+            srcHost.value = destHost.value;
+            srcPort.value = destPort.value;
+            destHost.value = tempHost;
+            destPort.value = tempPort;
+        }
+
+        function sendPacket() {
+            const packet = {
+                srcIP: document.getElementById('src-host').value,
+                srcPort: parseInt(document.getElementById('src-port').value),
+                destIP: document.getElementById('dest-host').value,
+                destPort: parseInt(document.getElementById('dest-port').value),
+                type: document.getElementById('packet-type').value
+            };
+
+            // Find the destination host
+            const destHost = packet.destIP === '1.1.1.1' ? host1 : host2;
+            const srcHost = packet.srcIP === '1.1.1.1' ? host1 : host2;
+            
+            // Handle the packet
+            srcHost.handlePacket(packet, true);
+            destHost.handlePacket(packet, false);
+            
+            // Update the display
+            updateHostState();
+        }
+
+        // Initialize the display
+        updateHostState();
+    </script>
+</body>
+</html>
